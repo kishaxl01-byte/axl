@@ -1,0 +1,6 @@
+{
+  "name": "StudyFlow",
+  "description": "Comprehensive student assignment tracker, custom activity scheduler, focus study timer, deadline reminder alarms, and calendar integration for high school and college students.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
