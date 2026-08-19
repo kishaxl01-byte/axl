@@ -9,6 +9,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    # NOTE: If your entire app is inside a subfolder, you can define defaults here
+    # defaults:
+    #   run:
+    #     working-directory: ./your-subfolder-name
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -20,6 +25,8 @@ jobs:
 
       - name: Install dependencies
         run: npm install
+        # FIX: If package.json is in a subfolder, uncomment the line below and replace with your folder name.
+        # working-directory: ./your-subfolder-name 
 
       - name: Setup Java Development Kit (JDK)
         uses: actions/setup-java@v4
@@ -28,7 +35,8 @@ jobs:
           java-version: '17' # Android builds typically require Java 11 or 17
 
       - name: Build Android APK
-        # Navigates to the android folder and runs the Gradle build command
+        # Navigates to the android folder and runs the Gradle build command.
+        # FIX: If your android folder is nested, change 'cd android' to 'cd your-subfolder/android'
         run: |
           cd android
           chmod +x ./gradlew
@@ -38,5 +46,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: app-release-apk
-          # Standard path for React Native/Capacitor release APKs
+          # Standard path for React Native/Capacitor release APKs. 
+          # FIX: Update this path if your android folder is inside a subfolder.
           path: android/app/build/outputs/apk/release/app-release.apk
