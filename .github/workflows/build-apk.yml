@@ -1,10 +1,9 @@
-name: Build Application
+name: Build Application (APK)
 
 on:
   push:
-    branches: [ "main", "master" ]
-  pull_request:
-    branches: [ "main", "master" ]
+    branches:
+      - main # Triggers on pushes to the main branch
 
 jobs:
   build:
@@ -17,28 +16,27 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '24' 
+          node-version: '18' # Adjust to your project's required Node version
 
       - name: Install dependencies
-        run: |
-          if [ -f package.json ]; then
-            npm install --legacy-peer-deps
-          else
-            echo "Warning: package.json not found in the root directory. Skipping npm install."
-          fi
+        run: npm install
 
-      - name: Run tests
-        run: |
-          if [ -f package.json ]; then
-            npm test --if-present
-          else
-            echo "Warning: package.json not found. Skipping tests."
-          fi
+      - name: Setup Java Development Kit (JDK)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17' # Android builds typically require Java 11 or 17
 
-      - name: Build app
+      - name: Build Android APK
+        # Navigates to the android folder and runs the Gradle build command
         run: |
-          if [ -f package.json ]; then
-            npm run build --if-present
-          else
-            echo "Warning: package.json not found. Skipping build."
-          fi
+          cd android
+          chmod +x ./gradlew
+          ./gradlew assembleRelease
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-apk
+          # Standard path for React Native/Capacitor release APKs
+          path: android/app/build/outputs/apk/release/app-release.apk
