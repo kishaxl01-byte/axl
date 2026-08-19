@@ -27,12 +27,10 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Ensure Gradle Wrapper exists with compatible version
+      - name: Force Gradle Wrapper to version 9.3.1
         run: |
-          if [ ! -f "gradlew" ]; then
-            echo "gradlew not found, generating wrapper with Gradle 8.7..."
-            gradle wrapper --gradle-version 8.7
-          fi
+          echo "Setting up Gradle wrapper with version 9.3.1..."
+          gradle wrapper --gradle-version 9.3.1
 
       - name: Create dummy google-services.json if missing
         run: |
