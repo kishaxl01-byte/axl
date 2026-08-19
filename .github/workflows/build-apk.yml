@@ -69,10 +69,10 @@ jobs:
 
           echo "GRADLE_DIR=$GRADLE_DIR" >> $GITHUB_ENV
 
-      - name: Configure Gradle Properties (Memory Fix)
+      - name: Configure Gradle Properties (Memory & Headless Fix)
         run: |
           mkdir -p ~/.gradle
-          echo "org.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8" >> ~/.gradle/gradle.properties
+          echo "org.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8 -Djava.awt.headless=true" >> ~/.gradle/gradle.properties
           echo "org.gradle.parallel=true" >> ~/.gradle/gradle.properties
 
       - name: Inject Java 17 Compatibility
