@@ -35,9 +35,21 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Inject Java 17 & Kotlin Compatibility
+      - name: Locate Android Project & Inject Compatibility
         run: |
-          cat << 'EOF' >> android/app/build.gradle
+          GRADLEW_PATH=$(find . -name "gradlew" | head -n 1)
+          if [ -z "$GRADLEW_PATH" ]; then
+            echo "Error: Could not find gradlew file in repository."
+            exit 1
+          fi
+
+          GRADLE_DIR=$(dirname "$GRADLEW_PATH")
+          echo "GRADLE_DIR=$GRADLE_DIR" >> $GITHUB_ENV
+          echo "Found gradlew in: $GRADLE_DIR"
+
+          TARGET_GRADLE="$GRADLE_DIR/app/build.gradle"
+          if [ -f "$TARGET_GRADLE" ]; then
+            cat << 'EOF' >> "$TARGET_GRADLE"
 
           android {
               compileOptions {
@@ -49,20 +61,44 @@ jobs:
               }
           }
           EOF
+            echo "Successfully updated $TARGET_GRADLE"
+          elif [ -f "$GRADLE_DIR/build.gradle" ]; then
+            cat << 'EOF' >> "$GRADLE_DIR/build.gradle"
+
+          subprojects {
+              afterEvaluate { project ->
+                  if (project.hasProperty('android')) {
+                      project.android {
+                          compileOptions {
+                              sourceCompatibility JavaVersion.VERSION_17
+                              targetCompatibility JavaVersion.VERSION_17
+                          }
+                          kotlinOptions {
+                              jvmTarget = '17'
+                          }
+                      }
+                  }
+              }
+          }
+          EOF
+            echo "Successfully updated $GRADLE_DIR/build.gradle"
+          fi
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
       - name: Grant execute permission for gradlew
-        run: chmod +x android/gradlew
+        run: chmod +x "${{ env.GRADLE_DIR }}/gradlew"
 
       - name: Build Android APK
-        working-directory: android
+        working-directory: ${{ env.GRADLE_DIR }}
         run: ./gradlew assembleDebug --stacktrace
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-debug-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: |
+            **/build/outputs/apk/debug/*.apk
+            **/build/outputs/apk/**/*.apk
           retention-days: 14
