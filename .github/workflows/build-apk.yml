@@ -13,34 +13,34 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18' 
+
+      - name: Install dependencies
+        # This will fail if package.json is missing from your repository
+        run: npm install
+
+      - name: Generate Android Folder (Expo/React Native)
+        # This dynamically creates the missing 'android' folder
+        run: npx expo prebuild --platform android
+
       - name: Setup Java Development Kit (JDK)
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
-          java-version: '17' # Standard for modern Android builds
+          java-version: '17' 
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Find Android Project and Build APK
-        # This script automatically searches for your Android build files
-        run: |
-          BUILD_GRADLE_PATH=$(find . -name "build.gradle" -o -name "build.gradle.kts" | head -n 1)
-          
-          if [ -z "$BUILD_GRADLE_PATH" ]; then
-            echo "❌ ERROR: No Android project found! There is no build.gradle file in your repository."
-            exit 1
-          fi
-          
-          PROJECT_DIR=$(dirname "$BUILD_GRADLE_PATH")
-          echo "✅ Found Android project in directory: $PROJECT_DIR"
-          
-          cd "$PROJECT_DIR"
-          gradle assembleRelease
+      - name: Build Android APK
+        working-directory: ./android
+        run: gradle assembleRelease
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-release-apk
-          # The '**' wildcard automatically finds the APK regardless of folder structure
           path: '**/build/outputs/apk/release/*.apk'
