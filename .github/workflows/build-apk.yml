@@ -1,75 +1,48 @@
-name: Build Application (APK)
+name: Build Android APK
 
 on:
   push:
     branches:
-      - main
-      - master
+      - main # Change this if your default branch is 'master'
+  workflow_dispatch: # Allows you to trigger the build manually from the Actions tab
 
 jobs:
   build:
+    name: Build APK
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Pull your repository code into the runner
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Set up Node.js environment
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '18' # Update to match your project's Node version
+          cache: 'npm'
 
-      # 3. Automatically find package.json anywhere in the repo and install dependencies
-      - name: Smart Install Dependencies
-        run: |
-          PKG_JSON=$(find . -name "package.json" -not -path "*/node_modules/*" | head -n 1)
-          if [ -z "$PKG_JSON" ]; then
-            echo "❌ ERROR: No package.json file exists. Please ensure your project source code is fully pushed to GitHub."
-            exit 1
-          fi
-          DIR=$(dirname "$PKG_JSON")
-          echo "✅ Found package.json in directory: $DIR"
-          cd "$DIR"
-          npm install
+      - name: Install Dependencies
+        run: npm install # Or use 'yarn install' if you use Yarn
 
-      # 4. Set up Java Development Kit required for Android compilation
       - name: Setup Java Development Kit (JDK)
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
-          java-version: '17'
+          java-version: '17' # React Native typically requires Java 17
 
-      # 5. Set up Gradle build system runner
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      # 6. Dynamically locate the Android folder/gradle files and build the release APK
-      - name: Smart Build Android APK
-        run: |
-          BUILD_GRADLE=$(find . -name "build.gradle" -o -name "build.gradle.kts" | head -n 1)
-          
-          if [ -z "$BUILD_GRADLE" ]; then
-            echo "❌ ERROR: No Android project (build.gradle) found in this repository."
-            exit 1
-          fi
-          
-          PROJECT_DIR=$(dirname "$BUILD_GRADLE")
-          echo "✅ Found Android project in: $PROJECT_DIR"
-          cd "$PROJECT_DIR"
-          
-          # Use local gradlew wrapper if available, otherwise fallback to system gradle
-          if [ -f "./gradlew" ]; then
-            chmod +x ./gradlew
-            ./gradlew assembleRelease
-          else
-            gradle assembleRelease
-          fi
+      - name: Grant execute permission for gradlew
+        run: chmod +x android/gradlew
 
-      # 7. Package and upload the resulting APK file to your workflow run artifacts
+      - name: Build Android APK
+        working-directory: android
+        run: ./gradlew assembleRelease
+
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-release-apk
-          path: '**/build/outputs/apk/release/*.apk'
+          path: android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 14
