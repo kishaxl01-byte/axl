@@ -29,7 +29,7 @@ jobs:
           elif [ $(find . -name "package.json" -not -path "*/node_modules/*" | wc -l) -gt 0 ]; then
             TARGET_DIR=$(dirname $(find . -name "package.json" -not -path "*/node_modules/*" | head -n 1))
             echo "package.json found in $TARGET_DIR. Running npm install..."
-            cd $TARGET_DIR && npm install
+            cd "$TARGET_DIR" && npm install
           else
             echo "No package.json found. Skipping Node dependency step."
           fi
@@ -64,7 +64,13 @@ jobs:
             gradle wrapper
           fi
 
-          # 3. Build the debug APK
+          # 3. Generate a temporary debug keystore to satisfy the signing configuration
+          if [ ! -f "debug.keystore" ]; then
+            echo "debug.keystore missing. Generating a standard debug keystore..."
+            keytool -genkey -v -keystore debug.keystore -alias androiddebugkey -storepass android -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "C=US, O=Android, CN=Android Debug"
+          fi
+
+          # 4. Build the debug APK
           chmod +x gradlew
           ./gradlew assembleDebug
 
