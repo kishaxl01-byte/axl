@@ -37,8 +37,11 @@ jobs:
       - name: Grant execute permission for Gradle wrapper
         run: chmod +x gradlew
 
-      - name: Build APK with Gradle
-        run: ./gradlew assembleDebug
+      - name: Install Xvfb (Virtual Framebuffer)
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+
+      - name: Build APK with Gradle under Xvfb
+        run: xvfb-run ./gradlew assembleDebug
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
