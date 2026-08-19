@@ -22,14 +22,25 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Build Android APK
-        # This is the crucial fix: It forces Gradle to run inside the 'android' subfolder
-        working-directory: ./android
-        run: gradle assembleRelease
+      - name: Find Android Project and Build APK
+        # This script automatically searches for your Android build files
+        run: |
+          BUILD_GRADLE_PATH=$(find . -name "build.gradle" -o -name "build.gradle.kts" | head -n 1)
+          
+          if [ -z "$BUILD_GRADLE_PATH" ]; then
+            echo "❌ ERROR: No Android project found! There is no build.gradle file in your repository."
+            exit 1
+          fi
+          
+          PROJECT_DIR=$(dirname "$BUILD_GRADLE_PATH")
+          echo "✅ Found Android project in directory: $PROJECT_DIR"
+          
+          cd "$PROJECT_DIR"
+          gradle assembleRelease
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-release-apk
-          # The '**' wildcard automatically searches all folders for the generated APK
+          # The '**' wildcard automatically finds the APK regardless of folder structure
           path: '**/build/outputs/apk/release/*.apk'
