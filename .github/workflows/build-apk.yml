@@ -45,16 +45,31 @@ jobs:
 
       - name: Build Android APK
         run: |
-          if [ -f android/gradlew ]; then
-            cd android
-            chmod +x gradlew
-            ./gradlew assembleDebug
-          elif [ -f gradlew ]; then
+          # 1. Look for existing gradlew wrapper anywhere in the repository
+          GRADLEW_PATH=$(find . -name "gradlew" -not -path "*/node_modules/*" | head -n 1)
+
+          if [ -n "$GRADLEW_PATH" ]; then
+            DIR=$(dirname "$GRADLEW_PATH")
+            echo "Found gradlew wrapper at $GRADLEW_PATH. Navigating to $DIR..."
+            cd "$DIR"
             chmod +x gradlew
             ./gradlew assembleDebug
           else
-            echo "Error: gradlew wrapper not found in root or android/ directory."
-            exit 1
+            # 2. If gradlew is missing, locate build.gradle and auto-generate the wrapper
+            BUILD_GRADLE=$(find . -name "build.gradle" -o -name "build.gradle.kts" -not -path "*/node_modules/*" | head -n 1)
+            
+            if [ -n "$BUILD_GRADLE" ]; then
+              DIR=$(dirname "$BUILD_GRADLE")
+              echo "No gradlew wrapper found. Found build file at $BUILD_GRADLE."
+              echo "Generating Gradle wrapper in $DIR..."
+              cd "$DIR"
+              gradle wrapper
+              chmod +x gradlew
+              ./gradlew assembleDebug
+            else
+              echo "Error: No Gradle build files found in the repository."
+              exit 1
+            fi
           fi
 
       - name: Upload APK Artifact
