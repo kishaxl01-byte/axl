@@ -19,15 +19,16 @@ jobs:
           distribution: 'zulu'
           java-version: '17' # Standard for modern Android builds
 
-      - name: Make gradlew executable
-        run: chmod +x ./gradlew
-
-      - name: Build Android APK
-        run: ./gradlew assembleRelease
+      - name: Make gradlew executable and Build APK
+        # This tells the step to run inside the 'android' folder where gradlew lives
+        working-directory: ./android
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleRelease
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-release-apk
-          # Standard path for native Android release APKs
-          path: app/build/outputs/apk/release/*.apk
+          # Standard path for frameworks where the android project is nested
+          path: android/app/build/outputs/apk/release/*.apk
