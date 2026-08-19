@@ -3,7 +3,8 @@ name: Build APK
 on:
   push:
     branches:
-      - main # Change to 'master' if your default branch is master
+      - main
+      - master
   workflow_dispatch:
 
 jobs:
@@ -21,7 +22,17 @@ jobs:
           node-version: '20'
 
       - name: Install Dependencies
-        run: npm install
+        run: |
+          if [ -f package.json ]; then
+            echo "package.json found in root. Running npm install..."
+            npm install
+          elif [ $(find . -name "package.json" -not -path "*/node_modules/*" | wc -l) -gt 0 ]; then
+            TARGET_DIR=$(dirname $(find . -name "package.json" -not -path "*/node_modules/*" | head -n 1))
+            echo "package.json found in $TARGET_DIR. Running npm install..."
+            cd $TARGET_DIR && npm install
+          else
+            echo "No package.json found. Skipping Node dependency step."
+          fi
 
       - name: Setup Java Development Kit (JDK)
         uses: actions/setup-java@v4
@@ -32,16 +43,23 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x android/gradlew
-
       - name: Build Android APK
-        working-directory: android
-        run: ./gradlew assembleRelease
+        run: |
+          if [ -f android/gradlew ]; then
+            cd android
+            chmod +x gradlew
+            ./gradlew assembleDebug
+          elif [ -f gradlew ]; then
+            chmod +x gradlew
+            ./gradlew assembleDebug
+          else
+            echo "Error: gradlew wrapper not found in root or android/ directory."
+            exit 1
+          fi
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-apk
-          path: android/app/build/outputs/apk/release/app-release.apk
+          name: app-debug-apk
+          path: '**/build/outputs/apk/debug/*.apk'
           retention-days: 14
