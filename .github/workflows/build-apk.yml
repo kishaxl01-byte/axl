@@ -1,134 +1,35 @@
-name: Build Android APK
+name: Build StudyFlow APK
 
 on:
   push:
-    branches:
-      - main
-      - master
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
   workflow_dispatch:
 
 jobs:
   build:
-    name: Build APK
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-
-      - name: Install Dependencies
-        run: |
-          if [ -f package.json ]; then
-            npm install
-          else
-            echo "No package.json found in root, proceeding with Android build..."
-          fi
-
-      - name: Setup Java Development Kit (JDK)
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
           java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
+      - name: Grant Execute Permission for Gradlew
+        run: chmod +x gradlew
 
-      - name: Locate Android Project & Prepare Wrapper
-        run: |
-          GRADLEW_PATH=$(find . -name "gradlew" | head -n 1)
-
-          if [ -n "$GRADLEW_PATH" ]; then
-            GRADLE_DIR=$(dirname "$GRADLEW_PATH")
-            echo "Found gradlew in: $GRADLE_DIR"
-          else
-            echo "gradlew not found. Searching for build.gradle..."
-            BUILD_GRADLE_PATH=$(find . -name "build.gradle" -o -name "build.gradle.kts" | head -n 1)
-            
-            if [ -n "$BUILD_GRADLE_PATH" ]; then
-              DIR_NAME=$(dirname "$BUILD_GRADLE_PATH")
-              if [ "$(basename "$DIR_NAME")" = "app" ]; then
-                GRADLE_DIR=$(dirname "$DIR_NAME")
-              else
-                GRADLE_DIR="$DIR_NAME"
-              fi
-              echo "Found Android Gradle project at: $GRADLE_DIR"
-              echo "Generating Gradle Wrapper..."
-              cd "$GRADLE_DIR"
-              gradle wrapper
-              cd -
-            else
-              echo "ERROR: Neither 'gradlew' nor 'build.gradle' was found in your repository."
-              exit 1
-            fi
-          fi
-
-          echo "GRADLE_DIR=$GRADLE_DIR" >> $GITHUB_ENV
-
-      - name: Configure Gradle Properties (Aggressive Memory Fix)
-        run: |
-          mkdir -p ~/.gradle
-          # Limit max memory to 2GB and enforce headless mode
-          echo "org.gradle.jvmargs=-Xmx2048m -XX:MaxMetaspaceSize=512m -Dfile.encoding=UTF-8 -Djava.awt.headless=true" >> ~/.gradle/gradle.properties
-          # Disable parallel builds to prevent memory exhaustion
-          echo "org.gradle.parallel=false" >> ~/.gradle/gradle.properties
-          echo "org.gradle.daemon=false" >> ~/.gradle/gradle.properties
-          # Prevent Kotlin from spawning a separate daemon
-          echo "kotlin.compiler.execution.strategy=in-process" >> ~/.gradle/gradle.properties
-
-      - name: Inject Java 17 Compatibility
-        run: |
-          TARGET_GRADLE="${{ env.GRADLE_DIR }}/app/build.gradle"
-          if [ -f "$TARGET_GRADLE" ]; then
-            cat << 'EOF' >> "$TARGET_GRADLE"
-
-          android {
-              compileOptions {
-                  sourceCompatibility JavaVersion.VERSION_17
-                  targetCompatibility JavaVersion.VERSION_17
-              }
-              kotlinOptions {
-                  jvmTarget = '17'
-              }
-          }
-          EOF
-          elif [ -f "${{ env.GRADLE_DIR }}/build.gradle" ]; then
-            cat << 'EOF' >> "${{ env.GRADLE_DIR }}/build.gradle"
-
-          subprojects {
-              afterEvaluate { project ->
-                  if (project.hasProperty('android')) {
-                      project.android {
-                          compileOptions {
-                              sourceCompatibility JavaVersion.VERSION_17
-                              targetCompatibility JavaVersion.VERSION_17
-                          }
-                          kotlinOptions {
-                              jvmTarget = '17'
-                          }
-                      }
-                  }
-              }
-          }
-          EOF
-          fi
-
-      - name: Grant execute permission for gradlew
-        run: chmod +x "${{ env.GRADLE_DIR }}/gradlew"
-
-      - name: Build Android APK (Clean & Assemble)
-        working-directory: ${{ env.GRADLE_DIR }}
-        run: ./gradlew clean assembleDebug --stacktrace --no-daemon
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug --stacktrace
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug-apk
-          path: |
-            **/build/outputs/apk/debug/*.apk
-            **/build/outputs/apk/**/*.apk
-          retention-days: 14
+          name: StudyFlow-Debug-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
