@@ -18,13 +18,21 @@ jobs:
         with:
           node-version: '18' 
 
-      - name: Install dependencies
-        # This will fail if package.json is missing from your repository
-        run: npm install
-
-      - name: Generate Android Folder (Expo/React Native)
-        # This dynamically creates the missing 'android' folder
-        run: npx expo prebuild --platform android
+      - name: Smart Install Dependencies
+        # This automatically searches all folders for package.json
+        run: |
+          PKG_JSON=$(find . -name "package.json" -not -path "*/node_modules/*" | head -n 1)
+          
+          if [ -z "$PKG_JSON" ]; then
+            echo "❌ ERROR: No package.json file exists anywhere in this GitHub repository."
+            echo "You must upload your app's source code to GitHub before trying to build it."
+            exit 1
+          fi
+          
+          DIR=$(dirname "$PKG_JSON")
+          echo "✅ Found package.json in directory: $DIR"
+          cd "$DIR"
+          npm install
 
       - name: Setup Java Development Kit (JDK)
         uses: actions/setup-java@v4
@@ -35,9 +43,20 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Build Android APK
-        working-directory: ./android
-        run: gradle assembleRelease
+      - name: Smart Build Android APK
+        # This automatically searches all folders for the Android project
+        run: |
+          BUILD_GRADLE=$(find . -name "build.gradle" -o -name "build.gradle.kts" | head -n 1)
+          
+          if [ -z "$BUILD_GRADLE" ]; then
+            echo "❌ ERROR: No Android project (build.gradle) found in this repository."
+            exit 1
+          fi
+          
+          PROJECT_DIR=$(dirname "$BUILD_GRADLE")
+          echo "✅ Found Android project in: $PROJECT_DIR"
+          cd "$PROJECT_DIR"
+          gradle assembleRelease
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
