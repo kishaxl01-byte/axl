@@ -1,4 +1,4 @@
-name: Build APK
+name: Build Android APK
 
 on:
   push:
@@ -19,19 +19,15 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '18'
+          cache: 'npm'
 
       - name: Install Dependencies
         run: |
           if [ -f package.json ]; then
-            echo "package.json found in root. Running npm install..."
             npm install
-          elif [ $(find . -name "package.json" -not -path "*/node_modules/*" | wc -l) -gt 0 ]; then
-            TARGET_DIR=$(dirname $(find . -name "package.json" -not -path "*/node_modules/*" | head -n 1))
-            echo "package.json found in $TARGET_DIR. Running npm install..."
-            cd "$TARGET_DIR" && npm install
           else
-            echo "No package.json found. Skipping Node dependency step."
+            echo "No package.json found in root, proceeding with Android build..."
           fi
 
       - name: Setup Java Development Kit (JDK)
@@ -40,43 +36,34 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
+      - name: Inject Java 17 & Kotlin Compatibility
+        run: |
+          cat << 'EOF' >> android/app/build.gradle
+
+          android {
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
+              }
+              kotlinOptions {
+                  jvmTarget = '17'
+              }
+          }
+          EOF
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
+      - name: Grant execute permission for gradlew
+        run: chmod +x android/gradlew
+
       - name: Build Android APK
-        run: |
-          # 1. Locate the true Android root directory containing settings.gradle
-          SETTINGS_FILE=$(find . -name "settings.gradle" -o -name "settings.gradle.kts" -not -path "*/node_modules/*" | head -n 1)
-
-          if [ -n "$SETTINGS_FILE" ]; then
-            ROOT_DIR=$(dirname "$SETTINGS_FILE")
-          else
-            # Fallback to the top-most folder containing a build.gradle file
-            ROOT_DIR=$(dirname $(find . -name "build.gradle" -o -name "build.gradle.kts" -not -path "*/node_modules/*" | head -n 1))
-          fi
-
-          echo "Targeting Android root project directory: $ROOT_DIR"
-          cd "$ROOT_DIR"
-
-          # 2. Check for or generate gradlew at the project root level
-          if [ ! -f "gradlew" ]; then
-            echo "No gradlew wrapper found at project root. Generating wrapper..."
-            gradle wrapper
-          fi
-
-          # 3. Generate a temporary debug keystore to satisfy the signing configuration
-          if [ ! -f "debug.keystore" ]; then
-            echo "debug.keystore missing. Generating a standard debug keystore..."
-            keytool -genkey -v -keystore debug.keystore -alias androiddebugkey -storepass android -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "C=US, O=Android, CN=Android Debug"
-          fi
-
-          # 4. Build the debug APK
-          chmod +x gradlew
-          ./gradlew assembleDebug
+        working-directory: android
+        run: ./gradlew assembleDebug --stacktrace
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-debug-apk
-          path: '**/build/outputs/apk/debug/*.apk'
+          path: android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 14
