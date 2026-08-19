@@ -26,7 +26,7 @@ jobs:
           if [ -f package.json ]; then
             npm install
           else
-            echo "No package.json found in root, proceeding with Android build..."
+            echo "No package.json found in root, proceeding..."
           fi
 
       - name: Setup Java Development Kit (JDK)
@@ -35,19 +35,44 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Locate Android Project & Inject Compatibility
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Locate Android Project & Prepare Wrapper
         run: |
           GRADLEW_PATH=$(find . -name "gradlew" | head -n 1)
-          if [ -z "$GRADLEW_PATH" ]; then
-            echo "Error: Could not find gradlew file in repository."
-            exit 1
+
+          if [ -n "$GRADLEW_PATH" ]; then
+            GRADLE_DIR=$(dirname "$GRADLEW_PATH")
+            echo "Found gradlew in: $GRADLE_DIR"
+          else
+            echo "gradlew not found. Searching for build.gradle..."
+            BUILD_GRADLE_PATH=$(find . -name "build.gradle" -o -name "build.gradle.kts" | head -n 1)
+            
+            if [ -n "$BUILD_GRADLE_PATH" ]; then
+              DIR_NAME=$(dirname "$BUILD_GRADLE_PATH")
+              if [ "$(basename "$DIR_NAME")" = "app" ]; then
+                GRADLE_DIR=$(dirname "$DIR_NAME")
+              else
+                GRADLE_DIR="$DIR_NAME"
+              fi
+              echo "Found Android Gradle project at: $GRADLE_DIR"
+              echo "Generating Gradle Wrapper..."
+              cd "$GRADLE_DIR"
+              gradle wrapper
+              cd -
+            else
+              echo "ERROR: Neither 'gradlew' nor 'build.gradle' was found in your repository."
+              echo "Please ensure your Android source files are committed and pushed to GitHub."
+              exit 1
+            fi
           fi
 
-          GRADLE_DIR=$(dirname "$GRADLEW_PATH")
           echo "GRADLE_DIR=$GRADLE_DIR" >> $GITHUB_ENV
-          echo "Found gradlew in: $GRADLE_DIR"
 
-          TARGET_GRADLE="$GRADLE_DIR/app/build.gradle"
+      - name: Inject Java 17 Compatibility
+        run: |
+          TARGET_GRADLE="${{ env.GRADLE_DIR }}/app/build.gradle"
           if [ -f "$TARGET_GRADLE" ]; then
             cat << 'EOF' >> "$TARGET_GRADLE"
 
@@ -61,9 +86,9 @@ jobs:
               }
           }
           EOF
-            echo "Successfully updated $TARGET_GRADLE"
-          elif [ -f "$GRADLE_DIR/build.gradle" ]; then
-            cat << 'EOF' >> "$GRADLE_DIR/build.gradle"
+            echo "Updated $TARGET_GRADLE"
+          elif [ -f "${{ env.GRADLE_DIR }}/build.gradle" ]; then
+            cat << 'EOF' >> "${{ env.GRADLE_DIR }}/build.gradle"
 
           subprojects {
               afterEvaluate { project ->
@@ -81,11 +106,8 @@ jobs:
               }
           }
           EOF
-            echo "Successfully updated $GRADLE_DIR/build.gradle"
+            echo "Updated ${{ env.GRADLE_DIR }}/build.gradle"
           fi
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
 
       - name: Grant execute permission for gradlew
         run: chmod +x "${{ env.GRADLE_DIR }}/gradlew"
