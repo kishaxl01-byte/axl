@@ -19,14 +19,14 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
 
       - name: Install Dependencies
         run: |
           if [ -f package.json ]; then
             npm install
           else
-            echo "No package.json found in root, proceeding..."
+            echo "No package.json found in root, proceeding with Android build..."
           fi
 
       - name: Setup Java Development Kit (JDK)
@@ -63,12 +63,17 @@ jobs:
               cd -
             else
               echo "ERROR: Neither 'gradlew' nor 'build.gradle' was found in your repository."
-              echo "Please ensure your Android source files are committed and pushed to GitHub."
               exit 1
             fi
           fi
 
           echo "GRADLE_DIR=$GRADLE_DIR" >> $GITHUB_ENV
+
+      - name: Configure Gradle Properties (Memory Fix)
+        run: |
+          mkdir -p ~/.gradle
+          echo "org.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8" >> ~/.gradle/gradle.properties
+          echo "org.gradle.parallel=true" >> ~/.gradle/gradle.properties
 
       - name: Inject Java 17 Compatibility
         run: |
@@ -86,7 +91,6 @@ jobs:
               }
           }
           EOF
-            echo "Updated $TARGET_GRADLE"
           elif [ -f "${{ env.GRADLE_DIR }}/build.gradle" ]; then
             cat << 'EOF' >> "${{ env.GRADLE_DIR }}/build.gradle"
 
@@ -106,7 +110,6 @@ jobs:
               }
           }
           EOF
-            echo "Updated ${{ env.GRADLE_DIR }}/build.gradle"
           fi
 
       - name: Grant execute permission for gradlew
@@ -114,7 +117,7 @@ jobs:
 
       - name: Build Android APK
         working-directory: ${{ env.GRADLE_DIR }}
-        run: ./gradlew assembleDebug --stacktrace
+        run: ./gradlew assembleDebug --stacktrace --no-daemon
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
